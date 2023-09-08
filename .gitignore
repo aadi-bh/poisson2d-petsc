@@ -1,0 +1,17 @@
+**__pycache__**
+*.o
+*.swp
+.DS_Store
+.cache
+.vscode
+CMakeCache.txt
+CMakeFiles/**
+CTestTestFile.cmake
+DartConfiguration.tcl
+Makefile
+Testing/**
+cmake_install.cmake
+compile_commands.json
+output/**
+poisson2d
+#.*#
