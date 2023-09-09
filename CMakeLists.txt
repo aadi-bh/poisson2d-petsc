@@ -12,7 +12,7 @@ set(CMAKE_VERBOSE_MAKEFILE FALSE)
 find_package(PkgConfig)
 
 # MPI and PETSc
-find_package(MPI)
+find_package(MPI REQUIRED)
 if (PKG_CONFIG_FOUND)
     pkg_check_modules(PETSC PETSc)
 endif()
@@ -49,7 +49,7 @@ set(ssw_sources
 )
 ADD_EXECUTABLE(poisson2d ${ssw_sources})
 
-target_link_libraries(poisson2d ${LIBRARIES})
+target_link_libraries(poisson2d ${LIBRARIES} MPI::MPI_CXX)
 target_compile_options(poisson2d PRIVATE
      $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
      -Wall -Wextra -pedantic-errors>
