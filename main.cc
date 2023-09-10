@@ -3,13 +3,11 @@
  *                              u = g = boundary_value in ∂Ω
  *             using Jacobi iterations.
  */
-#include <cstddef>
-#include <iostream>
-#include <mpi.h>
 #include <stdio.h>
 #include <fstream>
 #include <petsc.h>
 
+PetscErrorCode dumpVTR(DM da, Vec u, PetscInt iter);
 PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
                             PetscInt iter, PetscReal t, PetscInt c);
 
@@ -47,8 +45,8 @@ int main(int argc, char *argv[]) {
   // TODO no more parameters?
   PetscOptionsEnd();
   PetscCall(DMDACreate2d(PETSC_COMM_WORLD,
-                         /* boundary types */ DM_BOUNDARY_GHOSTED,
-                         DM_BOUNDARY_GHOSTED,
+                         /* boundary types */ DM_BOUNDARY_NONE,
+                         DM_BOUNDARY_NONE,
                          /* stencil shape */ DMDA_STENCIL_STAR,
                          /* grid size */ N, N,
                          /* ranks in each dim */ PETSC_DECIDE, PETSC_DECIDE,
@@ -96,16 +94,17 @@ int main(int argc, char *argv[]) {
   // TODO Fill f[j][i] with the appropriate rhs value. Why compute the same
   // thing over and over again?
   for (PetscInt j = jbeg; j < jbeg + nlocy; ++j)
-    for (PetscInt i = ibeg; i < ibeg + nlocy; ++i) {
+    for (PetscInt i = ibeg; i < ibeg + nlocx; ++i) {
       if (i == 0 || i == nx - 1 || j == 0 || j == ny - 1) {
         // Then this point is on the boundary! Set it to g(x,y)
         u[j][i] = boundary_value(alc[j][i].x, alc[j][i].y);
+        
       } else
         u[j][i] = 0.;
     }
-  write_rectilinear_grid(da, u_global, cda, clocal, 0, 0, 0);
   PetscCall(DMDAVecRestoreArray(da, u_local, &u));
   PetscCall(DMLocalToGlobal(da, u_local, INSERT_VALUES, u_global));
+  write_rectilinear_grid(da, u_global, cda, clocal, 0, 0, 0);
   // TODO save this initial condition instead of printing it out.
 
   // END OF IC SETUP. BEGIN ITER
@@ -143,14 +142,13 @@ int main(int argc, char *argv[]) {
     PetscCall(DMDAVecRestoreArrayRead(da, u_local, &u_old));
     PetscCall(DMDAVecRestoreArrayWrite(da, u_global, &u_new));
 
-    std::cout << maxdelta << std::endl;
     MPI_Allreduce(MPI_IN_PLACE, &maxdelta, 1, MPI_DOUBLE_PRECISION, MPI_MAX,
                 PETSC_COMM_WORLD);
     ++iter;
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD, "iter, maxdelta = %6d, %f\n", iter,
-                           maxdelta));
+    // PetscCall(PetscPrintf(PETSC_COMM_WORLD, "iter, maxdelta = %6d, %f\n", iter,
+    //                        maxdelta));
   }
-  VecView(u_global, PETSC_VIEWER_STDOUT_WORLD);
+  dumpVTR(da, u_global, iter);
   write_rectilinear_grid(da, u_global, cda, clocal, iter, 0, 0);
   PetscCall(DMDAVecRestoreArrayRead(cda, clocal, &alc));
   // Always a good idea to destroy everything.
@@ -165,6 +163,29 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
+PetscErrorCode dumpVTR(DM da, Vec u_global, PetscInt iter)
+{            
+  PetscFunctionBeginUser;
+  PetscInt id;
+  MPI_Comm_rank(PETSC_COMM_WORLD, &id);
+  char filename[64];
+  snprintf(filename, 64, "sol-%d-%d.vtr", id, iter);
+
+  Vec u_local;
+  PetscCall(DMGetLocalVector(da, &u_local));
+  PetscCall(DMGlobalToLocal(da, u_global, INSERT_VALUES, u_local));
+  
+  PetscViewer viewer;
+  PetscCall(PetscViewerCreate(PETSC_COMM_WORLD, &viewer));
+  PetscCall(PetscViewerSetType(viewer, PETSCVIEWERVTK));
+  PetscCall(PetscViewerFileSetName(viewer, filename));
+  PetscCall(VecView(u_local, viewer));
+  PetscCall(PetscPrintf(PETSC_COMM_SELF, "Saved to %s.\n", filename));
+  PetscCall(PetscViewerDestroy(&viewer));
+  PetscCall(DMRestoreLocalVector(da, &u_local));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 // TODO Separate everything into functions. Sweep at least.
 // from
 // https://github.com/aadi-bh/parallel/blob/60bfbfa85302bd9cf97ccc123c99032cfb496173/mpi/poisson3d.cc#L493
@@ -172,8 +193,14 @@ int main(int argc, char *argv[]) {
  * Writes out a VTK file with the given slice of an array
  */
 PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
-                            PetscInt iter, PetscReal t, PetscInt c) {
+                            PetscInt iter, PetscReal t, PetscInt c) {                          
+  PetscInt id;
+  MPI_Comm_rank(PETSC_COMM_WORLD, &id);
+  char filename[64];
+  snprintf(filename, 64, "sol-%d-%d.vtk", id, iter);
+
   using namespace std;
+  
   Vec u_local;
   PetscScalar **sol;
   PetscCall(DMGetLocalVector(da, &u_local));
@@ -185,7 +212,7 @@ PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
 
   PetscInt ibeg, jbeg, nlocx, nlocy;
   // TODO Get ghost coordinates so that we can plot those too
-  PetscCall(DMDAGetCorners(da, &ibeg, &jbeg, NULL, &nlocx, &nlocy, NULL));
+  PetscCall(DMDAGetGhostCorners(da, &ibeg, &jbeg, NULL, &nlocx, &nlocy, NULL));
   PetscInt index_range[2][2];
   index_range[0][0] = ibeg;
   index_range[0][1] = ibeg + nlocx;
@@ -196,13 +223,18 @@ PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
   for (int dir = 0; dir < 2; ++dir)
     n[dir] = index_range[dir][1] - index_range[dir][0];
 
-  PetscInt id;
-  MPI_Comm_rank(PETSC_COMM_WORLD, &id);
-  ofstream fout;
-  char filename[64];
-  snprintf(filename, 64, "sol-%d-%d.vtk", id, iter);
-  fout.open(filename);
+  const char *buffer;
+  PetscObjectGetName((PetscObject) u_global, &buffer);
+  char objName[64];
+  strncpy(objName, buffer, 64);
+  for (int c = 0, n = strlen(objName); c < n; ++c)
+  {
+    if (objName[c] == ' ') 
+      objName[c] = '_';
+  }
 
+  ofstream fout;
+  fout.open(filename);
   fout << "# vtk DataFile Version 3.0" << endl;
   fout << "Cartesian grid" << endl;
   fout << "ASCII" << endl;
@@ -226,7 +258,7 @@ PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
    fout << "Z_COORDINATES " << 1 << " float" << endl;
    fout << 0.0 << endl;
   fout << "POINT_DATA " << n[0] * n[1] << endl;
-  fout << "SCALARS density double" << endl;
+  fout << "SCALARS " << objName << " double" << endl;
   fout << "LOOKUP_TABLE default" << endl;
   for (int j = index_range[1][0]; j < index_range[1][1]; ++j) {
     for (int i = index_range[0][0]; i < index_range[0][1]; ++i)
@@ -235,9 +267,10 @@ PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
   }
   fout << endl;
   fout.close();
-  cout << filename << endl;
-//  PetscCall(PetscPrintf(PETSC_COMM_SELF, "%s\n", filename));
+  PetscCall(PetscPrintf(PETSC_COMM_SELF, "%s\n", filename));
   PetscCall(DMDAVecRestoreArrayRead(da, u_local, &sol));
   PetscCall(DMRestoreLocalVector(da, &u_local));
+  PetscCall(DMDAVecRestoreArrayRead(cda, clocal, &alc));
+
   return PetscErrorCode(PETSC_SUCCESS);
 }
