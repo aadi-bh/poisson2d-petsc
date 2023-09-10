@@ -4,11 +4,15 @@
  *             using Jacobi iterations.
  */
 #include <cstddef>
-#include <fstream>
+#include <iostream>
 #include <mpi.h>
+#include <stdio.h>
+#include <fstream>
 #include <petsc.h>
-void write_rectilinear_grid(DM da, PetscReal **sol, DMDACoor2d **alc,
+
+PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
                             PetscInt iter, PetscReal t, PetscInt c);
+
 PetscReal rhs(PetscInt x, PetscInt y) { return 4. * (pow(x, 4) + pow(y, 4)); }
 
 PetscReal boundary_value(PetscReal x, PetscReal y) { return x * x + y * y; }
@@ -99,7 +103,7 @@ int main(int argc, char *argv[]) {
       } else
         u[j][i] = 0.;
     }
-  write_rectilinear_grid(da, u, alc, 0, 0, 0);
+  write_rectilinear_grid(da, u_global, cda, clocal, 0, 0, 0);
   PetscCall(DMDAVecRestoreArray(da, u_local, &u));
   PetscCall(DMLocalToGlobal(da, u_local, INSERT_VALUES, u_global));
   // TODO save this initial condition instead of printing it out.
@@ -139,13 +143,15 @@ int main(int argc, char *argv[]) {
     PetscCall(DMDAVecRestoreArrayRead(da, u_local, &u_old));
     PetscCall(DMDAVecRestoreArrayWrite(da, u_global, &u_new));
 
-    MPI_Allreduce(MPI_IN_PLACE, &maxdelta, 1, MPI_DOUBLE, MPI_MAX,
-                  MPI_COMM_WORLD);
+    std::cout << maxdelta << std::endl;
+    MPI_Allreduce(MPI_IN_PLACE, &maxdelta, 1, MPI_DOUBLE_PRECISION, MPI_MAX,
+                PETSC_COMM_WORLD);
     ++iter;
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "iter, maxdelta = %6d, %f\n", iter,
                           maxdelta));
   }
-  write_rectilinear_grid(da, u_new, alc, iter, 0, 0);
+  VecView(u_global, PETSC_VIEWER_STDOUT_WORLD);
+  write_rectilinear_grid(da, u_global, cda, clocal, iter, 0, 0);
   PetscCall(DMDAVecRestoreArrayRead(cda, clocal, &alc));
   // Always a good idea to destroy everything.
   PetscCall(VecDestroy(&u_global));
@@ -165,11 +171,21 @@ int main(int argc, char *argv[]) {
 /*
  * Writes out a VTK file with the given slice of an array
  */
-void write_rectilinear_grid(DM da, PetscReal **sol, DMDACoor2d **alc,
+PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
                             PetscInt iter, PetscReal t, PetscInt c) {
   using namespace std;
+  Vec u_local;
+  PetscScalar **sol;
+  PetscCall(DMGetLocalVector(da, &u_local));
+  PetscCall(DMGlobalToLocal(da, u_global, INSERT_VALUES, u_local));
+  PetscCall(DMDAVecGetArrayRead(da, u_local, &sol));
+
+  DMDACoor2d **alc;
+  PetscCall(DMDAVecGetArrayRead(cda, clocal, &alc));
+
   PetscInt ibeg, jbeg, nlocx, nlocy;
-  DMDAGetGhostCorners(da, &ibeg, &jbeg, NULL, &nlocx, &nlocy, NULL);
+  // TODO Get ghost coordinates so that we can plot those too
+  PetscCall(DMDAGetCorners(da, &ibeg, &jbeg, NULL, &nlocx, &nlocy, NULL));
   PetscInt index_range[2][2];
   index_range[0][0] = ibeg;
   index_range[0][1] = ibeg + nlocx;
@@ -198,13 +214,13 @@ void write_rectilinear_grid(DM da, PetscReal **sol, DMDACoor2d **alc,
   fout << c << endl;
   fout << "DIMENSIONS " << n[0] << " " << n[1] << " " << 1 << endl;
   fout << "X_COORDINATES " << n[0] << " float" << endl;
-
-  for (int i = 0; i < n[0]; ++i)
+  
+  for (int i = ibeg; i < ibeg + nlocx; ++i)
     fout << alc[0][i].x << " ";
   fout << endl;
 
   fout << "Y_COORDINATES " << n[1] << " float" << endl;
-  for (int j = 0; j < n[1]; ++j)
+  for (int j = jbeg; j < jbeg + nlocy; ++j)
     fout << alc[j][0].y << " ";
   fout << endl;
    fout << "Z_COORDINATES " << 1 << " float" << endl;
@@ -219,5 +235,9 @@ void write_rectilinear_grid(DM da, PetscReal **sol, DMDACoor2d **alc,
   }
   fout << endl;
   fout.close();
-  PetscPrintf(PETSC_COMM_SELF, "%s\n", filename);
+  cout << filename << endl;
+//  PetscCall(PetscPrintf(PETSC_COMM_SELF, "%s\n", filename));
+  PetscCall(DMDAVecRestoreArrayRead(da, u_local, &sol));
+  PetscCall(DMRestoreLocalVector(da, &u_local));
+  return PetscErrorCode(PETSC_SUCCESS);
 }
