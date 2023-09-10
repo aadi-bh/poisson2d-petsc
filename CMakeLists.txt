@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(MAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_VERBOSE_MAKEFILE TRUE)
 set(CMAKE_VERBOSE_MAKEFILE FALSE)
+set(EXTRA_DEBUG_FLAGS STRING "-errors -fsanitize=address -fno-omit-frame-pointer -fsanitize-recover=address")
 
 # PkgConfig 
 find_package(PkgConfig)
@@ -18,11 +19,11 @@ if (PKG_CONFIG_FOUND)
 endif()
 
 if (PETSC_FOUND)
-    list(APPEND COMPILE_OPTIONS ${PETSC_CFLAGS})
+	list(APPEND COMPILE_OPTIONS ${PETSC_CFLAGS} ${EXTRA_DEBUG_FLAGS})
 
     include_directories(${PETSC_INCLUDE_DIRS})
     
-    set(LINK_FLAGS "${LINK_FLAGS} ${PETSC_LDFLAGS}")   
+    set(LINK_FLAGS "${LINK_FLAGS} ${PETSC_LDFLAGS} ${EXTRA_DEBUG_FLAGS}")   
     
     list(APPEND LIBRARIES ${PETSC_LINK_LIBRARIES})   
     
@@ -52,7 +53,7 @@ ADD_EXECUTABLE(poisson2d ${ssw_sources})
 target_link_libraries(poisson2d ${LIBRARIES} MPI::MPI_CXX)
 target_compile_options(poisson2d PRIVATE
      $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
-     -Wall -Wextra -pedantic-errors>
+     -Wall -Wextra -pedantic>
      $<$<CXX_COMPILER_ID:MSVC>:
      /W4>)
 
