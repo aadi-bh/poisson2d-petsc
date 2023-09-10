@@ -148,7 +148,7 @@ int main(int argc, char *argv[]) {
                 PETSC_COMM_WORLD);
     ++iter;
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "iter, maxdelta = %6d, %f\n", iter,
-                          maxdelta));
+                           maxdelta));
   }
   VecView(u_global, PETSC_VIEWER_STDOUT_WORLD);
   write_rectilinear_grid(da, u_global, cda, clocal, iter, 0, 0);
@@ -216,12 +216,12 @@ PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
   fout << "X_COORDINATES " << n[0] << " float" << endl;
   
   for (int i = ibeg; i < ibeg + nlocx; ++i)
-    fout << alc[0][i].x << " ";
+    fout << alc[jbeg][i].x << " ";
   fout << endl;
 
   fout << "Y_COORDINATES " << n[1] << " float" << endl;
   for (int j = jbeg; j < jbeg + nlocy; ++j)
-    fout << alc[j][0].y << " ";
+    fout << alc[j][ibeg].y << " ";
   fout << endl;
    fout << "Z_COORDINATES " << 1 << " float" << endl;
    fout << 0.0 << endl;
