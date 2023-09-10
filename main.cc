@@ -7,7 +7,7 @@
 #include <fstream>
 #include <petsc.h>
 
-PetscErrorCode dumpVTR(DM da, Vec u, PetscInt iter);
+PetscErrorCode viewerOutput(DM da, Vec u, PetscInt iter);
 PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
                             PetscInt iter, PetscReal t, PetscInt c);
 
@@ -148,7 +148,7 @@ int main(int argc, char *argv[]) {
     // PetscCall(PetscPrintf(PETSC_COMM_WORLD, "iter, maxdelta = %6d, %f\n", iter,
     //                        maxdelta));
   }
-  dumpVTR(da, u_global, iter);
+  viewerOutput(da, u_global, iter);
   write_rectilinear_grid(da, u_global, cda, clocal, iter, 0, 0);
   PetscCall(DMDAVecRestoreArrayRead(cda, clocal, &alc));
   // Always a good idea to destroy everything.
@@ -163,7 +163,7 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-PetscErrorCode dumpVTR(DM da, Vec u_global, PetscInt iter)
+PetscErrorCode viewerOutput(DM da, Vec u_global, PetscInt iter)
 {            
   PetscFunctionBeginUser;
   PetscInt id;
