@@ -7,29 +7,35 @@
  */
 #include <fstream>
 #include <petsc.h>
+#include <petscdm.h>
+#include <petscsys.h>
+#include <petscvec.h>
+#include <petscviewerhdf5.h>
 #include <stdio.h>
 
 PetscErrorCode viewerOutput(DM da, Vec u, PetscInt iter);
 PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
                                       PetscInt iter, PetscReal t, PetscInt c);
 
+PetscErrorCode savesol(int *c, DM);
 PetscReal rhs(PetscInt x, PetscInt y) { return 4. * (pow(x, 4) + pow(y, 4)); }
 PetscReal boundary_value(PetscReal x, PetscReal y) { return x * x + y * y; }
 
-int main(int argc, char *argv[]) {
-  char help[] = "Solves -∆u = f\n";
-  PetscReal xmin = -1.;
-  PetscReal xmax = 1.;
-  PetscReal ymin = -1.;
-  PetscReal ymax = 1;
-  PetscInt nx = 100;
-  PetscInt ny = 100;
-  PetscReal eps = 1e-5;
-  PetscInt itermax = 10000;
+int main(int argc, char *argv[])
+{
+  char      help[]  = "Solves -∆u = f\n";
+  PetscReal xmin    = -1.;
+  PetscReal xmax    = 1.;
+  PetscReal ymin    = -1.;
+  PetscReal ymax    = 1;
+  PetscInt  nx      = 100;
+  PetscInt  ny      = 100;
+  PetscReal eps     = 1e-5;
+  PetscInt  itermax = 10000;
   // DM stands for "distributed mesh"
   // da stands for "distributed array"
-  DM da;
-  Vec u_local, u_global;
+  DM        da;
+  Vec       u_local, u_global;
   PetscReal dx, dy;
 
   // This calls MPI_Init unless we have already.
@@ -82,8 +88,8 @@ int main(int argc, char *argv[]) {
   PetscCall(DMDAGetCorners(da, &ibeg, &jbeg, NULL, &nlocx, &nlocy, NULL));
 
   // Create an array with local coordinates.
-  DM cda;
-  Vec clocal;
+  DM           cda;
+  Vec          clocal;
   // DMDACoor2d is just a struct of 2 PetscScalars x and y.
   DMDACoor2d **alc;
   PetscCall(DMGetCoordinateDM(da, &cda));
@@ -98,13 +104,16 @@ int main(int argc, char *argv[]) {
   // TODO Store the rhs value at each [j][i]. Why compute again on every
   // iteration?
   for (PetscInt j = jbeg; j < jbeg + nlocy; ++j)
-    for (PetscInt i = ibeg; i < ibeg + nlocx; ++i) {
+    for (PetscInt i = ibeg; i < ibeg + nlocx; ++i)
+    {
       // TODO How do I check whether this point is on the boundary
       // when the domain gets more complex?
-      if (i == 0 || i == nx - 1 || j == 0 || j == ny - 1) {
+      if (i == 0 || i == nx - 1 || j == 0 || j == ny - 1)
+      {
         // Then this point is on the boundary! Set it to g(x,y)
         u[j][i] = boundary_value(alc[j][i].x, alc[j][i].y);
-      } else
+      }
+      else
         u[j][i] = 0.;
     }
   // Zeroes out the pointer u, among other things.
@@ -125,11 +134,12 @@ int main(int argc, char *argv[]) {
   uindices[0][1] = ibeg + nlocx == nx ? ibeg + nlocx - 1 : ibeg + nlocx;
   uindices[1][1] = jbeg + nlocy == ny ? jbeg + nlocy - 1 : jbeg + nlocy;
 
-  PetscReal maxdelta = 2. * eps;
-  PetscInt iter = 0;
+  PetscReal     maxdelta = 2. * eps;
+  PetscInt      iter     = 0;
   PetscScalar **u_old;
   PetscScalar **u_new;
-  while (iter < itermax && maxdelta > eps) {
+  while (iter < itermax && maxdelta > eps)
+  {
     // Transfer data from global to local array.
     PetscCall(DMGlobalToLocalBegin(da, u_global, INSERT_VALUES, u_local));
     PetscCall(DMGlobalToLocalEnd(da, u_global, INSERT_VALUES, u_local));
@@ -140,20 +150,22 @@ int main(int argc, char *argv[]) {
     // Get a pointer to the portion of memory where we will be putting the new
     // solution.
     PetscCall(DMDAVecGetArrayWrite(da, u_global, &u_new));
-    maxdelta = 0;
+    maxdelta                      = 0;
     PetscReal one_over_dx_squared = 1. / (dx * dx);
     PetscReal one_over_dy_squared = 1. / (dy * dy);
     PetscReal coefficient =
         0.5 * 1 / (one_over_dx_squared + one_over_dy_squared);
-    for (PetscInt j = uindices[1][0]; j < uindices[1][1]; ++j) {
-      for (PetscInt i = uindices[0][0]; i < uindices[0][1]; ++i) {
-          // Because u_local is a local array, ghost points will be accessible.
-          u_new[j][i] =
-              coefficient *
-              (rhs(alc[j][i].x, alc[j][i].y) +
-               (u_old[j - 1][i] + u_old[j + 1][i]) * one_over_dy_squared +
-               (u_old[j][i - 1] + u_old[j][i + 1]) * one_over_dx_squared);
-          maxdelta = std::max(abs(u_new[j][i] - u_old[j][i]), maxdelta);
+    for (PetscInt j = uindices[1][0]; j < uindices[1][1]; ++j)
+    {
+      for (PetscInt i = uindices[0][0]; i < uindices[0][1]; ++i)
+      {
+        // Because u_local is a local array, ghost points will be accessible.
+        u_new[j][i] =
+            coefficient
+            * (rhs(alc[j][i].x, alc[j][i].y)
+               + (u_old[j - 1][i] + u_old[j + 1][i]) * one_over_dy_squared
+               + (u_old[j][i - 1] + u_old[j][i + 1]) * one_over_dx_squared);
+        maxdelta = std::max(abs(u_new[j][i] - u_old[j][i]), maxdelta);
       }
     }
     PetscCall(DMDAVecRestoreArrayRead(da, u_local, &u_old));
@@ -166,7 +178,6 @@ int main(int argc, char *argv[]) {
     PetscCall(PetscPrintf(PETSC_COMM_WORLD, "iter, maxdelta = %6d, %f\n", iter,
                           maxdelta));
   }
-  // viewerOutput(da, u_global, iter);
   // Save the last one.
   write_rectilinear_grid(da, u_global, cda, clocal, iter, 0, 0);
 
@@ -190,7 +201,28 @@ int main(int argc, char *argv[]) {
 /*
  * Uses the VecView function to create a file in the required format
  */
-PetscErrorCode viewerOutput(DM da, Vec u_global, PetscInt iter) {
+PetscErrorCode savesol(int *c, DM da)
+{
+  PetscInt id;
+  MPI_Comm_rank(PETSC_COMM_WORLD, &id);
+  PetscErrorCode ierr;
+  char           filename[32] = "sol";
+  PetscViewer    viewer;
+  sprintf(filename, "sol-%d-%03d.h5", id, *c);
+  ierr =
+      PetscViewerHDF5Open(PETSC_COMM_SELF, filename, FILE_MODE_WRITE, &viewer);
+  CHKERRQ(ierr);
+  Vec ul;
+  PetscCall(DMGetLocalVector(da, &ul));
+  ierr = VecView(ul, viewer);
+  CHKERRQ(ierr);
+  PetscCall(DMRestoreLocalVector(da, &ul));
+  ierr = PetscViewerDestroy(&viewer);
+  CHKERRQ(ierr);
+  return (0);
+}
+PetscErrorCode viewerOutput(DM da, Vec u_global, PetscInt iter)
+{
 #if defined(PETSC_HAVE_HDF5)
   PetscFunctionBeginUser;
   PetscInt id;
@@ -203,7 +235,7 @@ PetscErrorCode viewerOutput(DM da, Vec u_global, PetscInt iter) {
   PetscCall(DMGlobalToLocal(da, u_global, INSERT_VALUES, u_local));
 
   PetscViewer viewer;
-  PetscCall(PetscViewerCreate(PETSC_COMM_WORLD, &viewer));
+  PetscCall(PetscViewerCreate(PETSC_COMM_SELF, &viewer));
   PetscCall(PetscViewerFileSetName(viewer, filename));
   PetscCall(PetscViewerSetType(viewer, PETSCVIEWERHDF5));
   PetscCall(VecView(u_local, viewer));
@@ -212,6 +244,7 @@ PetscErrorCode viewerOutput(DM da, Vec u_global, PetscInt iter) {
   PetscCall(DMRestoreLocalVector(da, &u_local));
   PetscFunctionReturn(PETSC_SUCCESS);
 #else
+  PetscPrintf("No HDF5\n");
   PetscFunctionReturn(PETSC_FALSE);
 #endif
 }
@@ -223,13 +256,14 @@ PetscErrorCode viewerOutput(DM da, Vec u_global, PetscInt iter) {
  * coordinates provided by clocal.
  */
 PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
-                                      PetscInt iter, PetscReal t, PetscInt c) {
+                                      PetscInt iter, PetscReal t, PetscInt c)
+{
   PetscInt id;
   MPI_Comm_rank(PETSC_COMM_WORLD, &id);
   char filename[64];
   snprintf(filename, 64, "sol-%d-%d.vtk", id, iter);
 
-  Vec u_local;
+  Vec           u_local;
   PetscScalar **sol;
   PetscCall(DMGetLocalVector(da, &u_local));
   // This fills u_local with the latest values, including ghosts.
@@ -248,7 +282,8 @@ PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
   PetscObjectGetName((PetscObject)u_global, &buffer);
   char objName[64];
   strncpy(objName, buffer, 64);
-  for (int c = 0, n = strlen(objName); c < n; ++c) {
+  for (int c = 0, n = strlen(objName); c < n; ++c)
+  {
     if (objName[c] == ' ')
       objName[c] = '_';
   }
@@ -284,7 +319,8 @@ PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
   fout << "POINT_DATA " << nlocx * nlocy << endl;
   fout << "SCALARS " << objName << " double" << endl;
   fout << "LOOKUP_TABLE default" << endl;
-  for (PetscInt j = jbeg; j < jbeg + nlocy; ++j) {
+  for (PetscInt j = jbeg; j < jbeg + nlocy; ++j)
+  {
     for (PetscInt i = ibeg; i < ibeg + nlocx; ++i)
       fout << sol[j][i] << " ";
     fout << endl;
