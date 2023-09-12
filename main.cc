@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
 
   PetscScalar **u;
   // VecGetArray will point u to the data stored inside u_local.
-  PetscCall(DMDAVecGetArray(da, u_local, &u));
+  PetscCall(DMDAVecGetArray(da, u_global, &u));
   // set the initial guess to zero, and boundary cells to boundary_value.
   // TODO Store the rhs value at each [j][i]. Why compute again on every
   // iteration?
@@ -108,9 +108,7 @@ int main(int argc, char *argv[]) {
         u[j][i] = 0.;
     }
   // Zeroes out the pointer u, among other things.
-  PetscCall(DMDAVecRestoreArray(da, u_local, &u));
-  // Updates the global vector with the local values.
-  PetscCall(DMLocalToGlobal(da, u_local, INSERT_VALUES, u_global));
+  PetscCall(DMDAVecRestoreArray(da, u_global, &u));
   // Save initial condition.
   write_rectilinear_grid(da, u_global, cda, clocal, 0, 0, 0);
 
