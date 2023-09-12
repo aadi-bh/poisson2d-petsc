@@ -284,12 +284,12 @@ PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
   fout << "DIMENSIONS " << nlocx << " " << nlocy << " " << 1 << endl;
 
   fout << "X_COORDINATES " << nlocx << " float" << endl;
-  for (int i = ibeg; i < ibeg + nlocx; ++i)
+  for (PetscInt i = ibeg; i < ibeg + nlocx; ++i)
     fout << alc[jbeg][i].x << " ";
   fout << endl;
 
   fout << "Y_COORDINATES " << nlocy << " float" << endl;
-  for (int j = jbeg; j < jbeg + nlocy; ++j)
+  for (PetscInt j = jbeg; j < jbeg + nlocy; ++j)
     fout << alc[j][ibeg].y << " ";
   fout << endl;
 
@@ -299,9 +299,9 @@ PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
   fout << "POINT_DATA " << nlocx * nlocy << endl;
   fout << "SCALARS " << objName << " double" << endl;
   fout << "LOOKUP_TABLE default" << endl;
-  for (int j = jbeg; j < nlocy; ++j)
+  for (PetscInt j = jbeg; j < jbeg + nlocy; ++j)
   {
-    for (int i = ibeg; i < nlocx; ++i)
+    for (PetscInt i = ibeg; i < ibeg + nlocx; ++i)
       fout << sol[j][i] << " ";
     fout << endl;
   }
