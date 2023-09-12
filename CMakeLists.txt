@@ -57,7 +57,9 @@ find_package(MPI REQUIRED)
 
 set(EXTRA_DEBUG_FLAGS STRING "-errors -fsanitize=address -fno-omit-frame-pointer -fsanitize-recover=address")
 
-list(APPEND COMPILE_OPTIONS ${MPI_CFLAGS} ${EXTRA_DEBUG_FLAGS})
+list(APPEND COMPILE_OPTIONS ${MPI_CFLAGS})
+# TODO it's possible that these flags are never used. Will have to check once something starts segfaulting again.
+list(APPEND CMAKE_CXX_COMPILE_OPTIONS_DEBUG ${EXTRA_DEBUG_FLAGS})
 include_directories(${MPI_INCLUDE_PATH})
 set(LINK_FLAGS "${LINK_FLAGS} ${MPI_LDFLAGS} ${EXTRA_DEBUG_FLAGS}")
 list(APPEND LIBRARIES ${MPI_C_LIBRARIES})
