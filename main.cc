@@ -305,12 +305,12 @@ PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
 
   fout << "X_COORDINATES " << nlocx << " float" << endl;
   for (PetscInt i = ibeg; i < ibeg + nlocx; ++i)
-    fout << alc[jbeg][i].x << " ";
+    fout << alc[jbeg+1][i].x << " ";
   fout << endl;
 
   fout << "Y_COORDINATES " << nlocy << " float" << endl;
   for (PetscInt j = jbeg; j < jbeg + nlocy; ++j)
-    fout << alc[j][ibeg].y << " ";
+    fout << alc[j][ibeg+1].y << " ";
   fout << endl;
 
   fout << "Z_COORDINATES " << 1 << " float" << endl;
