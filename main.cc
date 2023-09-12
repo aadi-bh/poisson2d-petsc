@@ -14,7 +14,7 @@
 #include <stdio.h>
 
 PetscErrorCode viewerOutput(DM da, Vec u, PetscInt iter);
-PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
+PetscErrorCode writeVTK(DM da, Vec u_global, DM cda, Vec clocal,
                                       PetscInt iter, PetscReal t, PetscInt c);
 
 PetscErrorCode savesol(int *c, DM);
@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
   // Zeroes out the pointer u, among other things.
   PetscCall(DMDAVecRestoreArray(da, u_global, &u));
   // Save initial condition.
-  write_rectilinear_grid(da, u_global, cda, clocal, 0, 0, 0);
+  writeVTK(da, u_global, cda, clocal, 0, 0, 0);
 
   /* ----------------------------
    * END OF SETUP
@@ -179,7 +179,7 @@ int main(int argc, char *argv[])
                           maxdelta));
   }
   // Save the last one.
-  write_rectilinear_grid(da, u_global, cda, clocal, iter, 0, 0);
+  writeVTK(da, u_global, cda, clocal, 1, 0, 0);
 
   /* ----------------
    * END OF ITER
@@ -255,7 +255,7 @@ PetscErrorCode viewerOutput(DM da, Vec u_global, PetscInt iter)
  * Writes out a VTK file with the local data in u_global. Corners and
  * coordinates provided by clocal.
  */
-PetscErrorCode write_rectilinear_grid(DM da, Vec u_global, DM cda, Vec clocal,
+PetscErrorCode writeVTK(DM da, Vec u_global, DM cda, Vec clocal,
                                       PetscInt iter, PetscReal t, PetscInt c)
 {
   PetscInt id;
