@@ -119,6 +119,14 @@ int main(int argc, char *argv[]) {
    * BEGIN ITERATIONS
    * ----------------------------
    */
+  // Find the indices to update with Jacobi iterations
+  PetscInt uindices[2][2];
+  // If the first or last point is on the global boundary then don't update it.
+  uindices[0][0] = ibeg == 0 ? 1 : ibeg;
+  uindices[1][0] = jbeg == 0 ? 1 : jbeg;
+  uindices[0][1] = ibeg + nlocx == nx ? ibeg + nlocx - 1 : ibeg + nlocx;
+  uindices[1][1] = jbeg + nlocy == ny ? jbeg + nlocy - 1 : jbeg + nlocy;
+
   PetscReal maxdelta = 2. * eps;
   PetscInt iter = 0;
   PetscScalar **u_old;
@@ -139,14 +147,8 @@ int main(int argc, char *argv[]) {
     PetscReal one_over_dy_squared = 1. / (dy * dy);
     PetscReal coefficient =
         0.5 * 1 / (one_over_dx_squared + one_over_dy_squared);
-    for (PetscInt j = jbeg; j < jbeg + nlocy; ++j) {
-      for (PetscInt i = ibeg; i < ibeg + nlocx; ++i) {
-        if (i * j == 0 || i == nx - 1 || j == ny - 1)
-          // We don't want to update the values on the boundary layer
-          // because Dirichlet BC.
-          // TODO DMAddBoundary?
-          continue;
-        else {
+    for (PetscInt j = uindices[1][0]; j < uindices[1][1]; ++j) {
+      for (PetscInt i = uindices[0][0]; i < uindices[0][1]; ++i) {
           // Because u_local is a local array, ghost points will be accessible.
           u_new[j][i] =
               coefficient *
@@ -154,7 +156,6 @@ int main(int argc, char *argv[]) {
                (u_old[j - 1][i] + u_old[j + 1][i]) * one_over_dy_squared +
                (u_old[j][i - 1] + u_old[j][i + 1]) * one_over_dx_squared);
           maxdelta = std::max(abs(u_new[j][i] - u_old[j][i]), maxdelta);
-        }
       }
     }
     PetscCall(DMDAVecRestoreArrayRead(da, u_local, &u_old));
