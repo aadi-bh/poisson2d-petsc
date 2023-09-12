@@ -198,6 +198,17 @@ int main(int argc, char *argv[])
   return 0;
 }
 
+PetscErrorCode jacobiSweep(DM da, PetscInt **u_indices)
+{
+  PetscFunctionBeginUser;
+  Vec u_local;
+  PetscCall(DMGetLocalVector(da, &u_local));
+  for (PetscInt j = u_indices[1][0]; j < u_indices[1][1]; ++j)
+    for (PetscInt i = u_indices[0][0]; i < u_indices[0][1]; ++i)
+
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /*
  * Uses the VecView function to create a file in the required format
  */
