@@ -2,7 +2,7 @@
  * Solves 2D Poisson equation -∆u = f = rhs            in Ω = [0,1]x[0,1]
  *                              u = g = boundary_value in ∂Ω
  *             using Jacobi iterations.
- *
+ *  Translated from Fortran version: https://github.com/cpraveen/parallel/mpi/poisson3d.f90
  *  Date: Friday, September 8th, 2023.
  */
 #include <fstream>
